@@ -2,6 +2,12 @@
 #define _BIT_STREAM_H_INCLUDED_
 
 #include <stdint.h>
+#include <stdio.h>
+
+/* BitStream_Seek関数の探索コード */
+#define BITSTREAM_SEEK_SET  SEEK_SET
+#define BITSTREAM_SEEK_CUR  SEEK_CUR
+#define BITSTREAM_SEEK_END  SEEK_END
 
 /* ビットストリーム構造体 */
 struct BitStream;
@@ -15,6 +21,13 @@ struct BitStream* BitStream_Open(const char* filepath,
 
 /* ビットストリームのクローズ */
 void BitStream_Close(struct BitStream* stream);
+
+/* シーク(fseek準拠)
+ * 注意）バッファをクリアするので副作用がある */
+int32_t BitStream_Seek(struct BitStream* stream, uint32_t offset, int32_t wherefrom);
+
+/* 現在位置(ftell)準拠 */
+int32_t BitStream_Tell(struct BitStream* stream);
 
 /* 1bit出力 */
 int32_t BitStream_PutBit(struct BitStream* stream, uint8_t bit);

@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -25,6 +24,9 @@ struct BitStream {
   int8_t  bit_count;  /* 内部ビット入出力カウント */
   void*   work_ptr;   /* ワーク領域先頭ポインタ   */
 };
+
+/* バッファにたまったビットをクリア */
+static void bitstream_FlushBuffer(struct BitStream* stream);
 
 /* ワークサイズの取得 */
 int32_t BitStream_CalculateWorkSize(void)
@@ -110,10 +112,8 @@ void BitStream_Close(struct BitStream* stream)
     return;
   }
 
-  /* バッファに余ったビットを強制出力 */
-  if (stream->flags & BITSTREAM_FLAGS_FILEOPENMODE_WRITE) {
-    BitStream_PutBits(stream, 7, 0);
-  }
+  /* バッファのクリア */
+  bitstream_FlushBuffer(stream);
 
   /* ファイルハンドルクローズ */
   fclose(stream->fp);
@@ -122,6 +122,31 @@ void BitStream_Close(struct BitStream* stream)
   if (!(stream->flags & BITSTREAM_FLAGS_MEMORYALLOC_BYWORK)) {
     free(stream->work_ptr);
   }
+}
+
+/* シーク(fseek準拠) */
+int32_t BitStream_Seek(struct BitStream* stream, uint32_t offset, int32_t wherefrom)
+{
+  /* 引数チェック */
+  if (stream == NULL) {
+    return -1;
+  }
+
+  /* 内部バッファをクリア（副作用が起こる） */
+  bitstream_FlushBuffer(stream);
+
+  return fseek(stream->fp, offset, wherefrom);
+}
+
+/* 現在位置(ftell)準拠 */
+int32_t BitStream_Tell(struct BitStream* stream)
+{
+  /* 引数チェック */
+  if (stream == NULL) {
+    return -1;
+  }
+
+  return ftell(stream->fp);
 }
 
 /* 1bit出力 */
@@ -294,4 +319,17 @@ int32_t BitStream_GetBits(struct BitStream* stream, uint16_t n_bits, uint64_t *v
   /* 正常終了 */
   *val = tmp;
   return 0;
+}
+
+/* バッファにたまったビットをクリア */
+static void bitstream_FlushBuffer(struct BitStream* stream)
+{
+  if (stream->flags & BITSTREAM_FLAGS_FILEOPENMODE_WRITE) {
+    /* バッファに余ったビットを強制出力 */
+    BitStream_PutBits(stream, 7, 0);
+  } else if (stream->flags & BITSTREAM_FLAGS_FILEOPENMODE_READ) {
+    /* バッファのクリア */
+    stream->bit_count   = 0;
+    stream->bit_buffer  = 0;
+  }
 }
